@@ -194,6 +194,23 @@ class TextStatisticsTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals(1.5, $this->TextStatistics->averageSyllablesPerWord('and then there was one because special ducklings deserve rainbows'));
     }
 
+    /* wordCount() collapses whitespace but these loops split on single spaces,
+       so the two counts can differ in either direction.
+    -------------------- */
+    public function testSyllableLoopsWhenWordCountExceedsSplitWords()
+    {
+        // Tabs survive cleanText(), so these also apply to the public API.
+        $this->assertEquals(1, $this->TextStatistics->averageSyllablesPerWord("and\tthen there"));
+        $this->assertEquals(1, $this->TextStatistics->wordsWithThreeSyllables("cat\tdog elephant"));
+    }
+
+    public function testSyllableLoopsWhenWordCountIsBelowSplitWords()
+    {
+        // Double spaces only reach Syllables directly; cleanText() removes them.
+        $this->assertEquals(2, DaveChild\TextStatistics\Syllables::averageSyllablesPerWord('because  special ducklings'));
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables('cat  dog elephant'));
+    }
+
     /* Test Words
     -------------------- */
     public function testWordCount()

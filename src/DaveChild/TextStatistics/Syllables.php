@@ -375,9 +375,8 @@ class Syllables
     public static function wordsWithThreeSyllables($strText, $blnCountProperNouns = true, $strEncoding = '')
     {
         $intLongWordCount = 0;
-        $intWordCount = Text::wordCount($strText, $strEncoding);
         $arrWords = explode(' ', $strText);
-        for ($i = 0; $i < $intWordCount; $i++) {
+        for ($i = 0; $i < count($arrWords); $i++) {
             if (Syllables::syllableCount($arrWords[$i], $strEncoding) > 2) {
                 if ($blnCountProperNouns) {
                     $intLongWordCount++;
