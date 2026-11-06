@@ -1,7 +1,9 @@
 # Backlog
 
-Known issues, highest impact first. Each one was reproduced on 2026-11-06 against
-`330786a`, except where noted. Examples use PHP double-quoted string escapes.
+Known issues, grouped by area, with the most important first in each group. Each
+one was reproduced on 2026-11-06, except where noted: issues 1-11 against `330786a`,
+and the security issues against `96babe3`. Examples use PHP double-quoted string
+escapes.
 
 Most fixes here change scores for non-ASCII text, so keep each in its own commit
 and mention the change in its commit message.
@@ -128,3 +130,47 @@ checked. This is the 1 incomplete test in the suite.
 
 **Suggested fix:** measure how many of those words fail, then fix the syllable rules
 or correct the expected values.
+
+## Security
+
+### 12. Text is shared between instances (low to medium)
+
+`TextStatistics::$strText` is static (`TextStatistics.php:67`), so a new instance
+called without text uses the last text from any other instance. In a long-running
+worker, this can expose one user's text to another.
+
+After `$a->wordCount('confidential tenant A text')`, a new instance `$b` gives:
+
+- `$b->wordCount()` returns 4.
+- `$b->setText(false)` returns `confidential tenant A text.`
+
+**Suggested fix:** make it an instance property. This is a breaking change for any
+code relying on the text being shared between instances.
+
+### 13. Large inputs have no size limit (low to medium)
+
+Scoring takes time and memory in proportion to input size, and the library sets no
+limit. `totalSyllables()` on 9 MB of unique words took about 20s and peaked at
+107 MB, and text beyond that can still hit a 128 MB memory limit with a fatal error.
+
+**Suggested fix:** applications taking untrusted text should cap its size before
+calling the library. Document this in the README, and consider an optional limit.
+
+### 14. Regexes take quadratic time without PCRE JIT (low)
+
+`([\.\s]*\.[\.\s]*)` in `cleanText()` slows down on long runs of whitespace when
+`pcre.jit` is off. 40 KB of spaces took 5.8s, and doubling the input takes about four
+times as long. With JIT on, 16 MB took 0.13s, so this mainly affects servers without
+JIT.
+
+**Suggested fix:** collapse whitespace before that step, and benchmark with
+`pcre.jit=0`.
+
+### 15. CI downloads and runs tools without verifying them (low)
+
+`.travis.yml` fetches `composer.phar` over plain HTTP and runs it, and runs
+`ocular.phar` from HTTPS, both with no checksum. Not reproduced: this comes from
+reading the file.
+
+**Suggested fix:** use HTTPS with checksums, or delete the file if Travis is no
+longer used.
