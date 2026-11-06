@@ -29,7 +29,7 @@ class Resource
 
         // Fetch Spache Words
         $arrSpacheWordList = array();
-        include_once('resources/SpacheWordList.php');
+        include_once(__DIR__ . '/resources/SpacheWordList.php');
         self::$arrSpache = $arrSpacheWordList;
 
         return $arrSpacheWordList;
@@ -47,7 +47,7 @@ class Resource
 
         // Fetch Dale-Chall Words
         $arrDaleChallWordList = array();
-        include_once('resources/DaleChallWordList.php');
+        include_once(__DIR__ . '/resources/DaleChallWordList.php');
         self::$arrDaleChall = $arrDaleChallWordList;
 
         return $arrDaleChallWordList;

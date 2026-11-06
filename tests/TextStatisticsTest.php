@@ -285,6 +285,33 @@ class TextStatisticsTest extends \PHPUnit\Framework\TestCase
         $this->assertSame('wait. now.', DaveChild\TextStatistics\Text::cleanText("wait\xE2\x80\xA6 now"));
     }
 
+    /* Word lists must come from the library, not the working directory or
+       include path. Separate process, as the lists are cached once loaded.
+    -------------------- */
+    /**
+     * @runInSeparateProcess
+     */
+    public function testWordListsIgnoreFilesInWorkingDirectory()
+    {
+        $strDir = sys_get_temp_dir() . '/textstatistics-' . uniqid();
+        mkdir($strDir . '/resources', 0700, true);
+        file_put_contents($strDir . '/resources/SpacheWordList.php', '<?php $arrSpacheWordList = array("hijacked");');
+        file_put_contents($strDir . '/resources/DaleChallWordList.php', '<?php $arrDaleChallWordList = array("hijacked");');
+        $strOriginalDir = getcwd();
+        chdir($strDir);
+
+        try {
+            $this->assertNotContains('hijacked', DaveChild\TextStatistics\Resource::fetchSpacheWordList());
+            $this->assertNotContains('hijacked', DaveChild\TextStatistics\Resource::fetchDaleChallWordList());
+        } finally {
+            chdir($strOriginalDir);
+            unlink($strDir . '/resources/SpacheWordList.php');
+            unlink($strDir . '/resources/DaleChallWordList.php');
+            rmdir($strDir . '/resources');
+            rmdir($strDir);
+        }
+    }
+
     /* Letters aren't limited to A-Z.
     -------------------- */
     public function testLetterCountIncludesNonAsciiLetters()
