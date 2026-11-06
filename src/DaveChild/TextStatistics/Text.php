@@ -6,6 +6,11 @@ class Text
 {
 
     /**
+     * Pattern matching the whitespace between words in UTF-8 text.
+     */
+    const WORD_SEPARATOR = '`(?:\s|\xC2\xA0)+`';
+
+    /**
      * @var array $clean Efficiency: Store strings once processed.
      */
     protected static $clean = array();
@@ -31,12 +36,32 @@ class Text
             return self::$clean[$key];
         }
 
-        // Non-breaking spaces separate words. Replace them before converting,
-        // because the conversion turns UTF-8 "à" into bytes containing C2 A0.
-        $strText = preg_replace('`&(nbsp|#0*160|#x0*a0);`i', ' ', $strText);
-        $strText = str_replace(mb_check_encoding($strText, 'UTF-8') ? "\xC2\xA0" : "\xA0", ' ', $strText);
-
-        $strText = mb_convert_encoding($strText, 'UTF-8', 'ISO-8859-1');
+        // Text that isn't valid UTF-8 is assumed to be single-byte. These bytes
+        // can only be replaced here, as they also occur inside UTF-8 characters.
+        if (!mb_check_encoding($strText, 'UTF-8')) {
+            $strText = str_replace(
+                array(
+                    chr(145),
+                    chr(146),
+                    chr(147),
+                    chr(148),
+                    chr(150),
+                    chr(151),
+                    chr(133)
+                ),
+                array(
+                    "'",
+                    "'",
+                    '"',
+                    '"',
+                    '-',
+                    '--',
+                    '...'
+                ),
+                $strText
+            );
+            $strText = mb_convert_encoding($strText, 'UTF-8', 'ISO-8859-1');
+        }
 
         // Curly quotes etc
         $strText = str_replace(
@@ -60,27 +85,6 @@ class Text
             ),
             $strText
         );
-        $strText = str_replace(
-            array(
-                chr(145),
-                chr(146),
-                chr(147),
-                chr(148),
-                chr(150),
-                chr(151),
-                chr(133)
-            ),
-            array(
-                "'",
-                "'",
-                '"',
-                '"',
-                '-',
-                '--',
-                '...'
-            ),
-            $strText
-        );
 
         // Replace periods within numbers
         $strText = preg_replace('`([^0-9][0-9]+)\.([0-9]+[^0-9])`mis', '${1}0$2', $strText);
@@ -91,6 +95,7 @@ class Text
         $strText = preg_replace('`\</?(address|blockquote|center|dir|div|dl|dd|dt|fieldset|form|h1|h2|h3|h4|h5|h6|menu|noscript|ol|p|pre|table|ul|li)[^>]*>`is', '.', $strText);
         $strText = html_entity_decode($strText);
         $strText = strip_tags($strText);
+        $strText = str_replace("\xC2\xA0", ' ', $strText); // Non-breaking spaces, including decoded &nbsp;
 
         // Assume blank lines (i.e., paragraph breaks) end sentences (useful
         // for titles in plain text documents) and replace remaining new
@@ -239,7 +244,7 @@ class Text
         }
 
         // Will be tripped by em dashes with spaces either side, among other similar characters
-        $intWords = 1 + self::textLength(preg_replace('`[^ ]`', '', preg_replace('`\s+`', ' ', $strText)), $strEncoding); // Space count + 1 is word count
+        $intWords = 1 + self::textLength(preg_replace('`[^ ]`', '', preg_replace(self::WORD_SEPARATOR, ' ', $strText)), $strEncoding); // Space count + 1 is word count
 
         return $intWords;
     }

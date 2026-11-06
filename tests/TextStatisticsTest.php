@@ -245,9 +245,44 @@ class TextStatisticsTest extends \PHPUnit\Framework\TestCase
 
     public function testAccentedLettersAreNotTreatedAsNonBreakingSpaces()
     {
-        // UTF-8 "à" is C3 A0, and contains C2 A0 once converted by cleanText().
+        // "à" is C3 A0 in UTF-8 and E0 in ISO-8859-1.
         $this->assertEquals(3, $this->TextStatistics->wordCount("p\xC3\xA0s de deux"));
         $this->assertEquals(3, $this->TextStatistics->wordCount("p\xE0s de deux"));
+        $this->assertEquals(3, DaveChild\TextStatistics\Text::wordCount("p\xC3\xA0s de deux"));
+        $this->assertEquals(2, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables("p\xC3\xA0s de deux elephant ananas"));
+    }
+
+    public function testNonBreakingSpacesSeparateWordsInDirectCalls()
+    {
+        $this->assertEquals(2, DaveChild\TextStatistics\Text::wordCount("same\xC2\xA0cat"));
+        $this->assertEquals(2, DaveChild\TextStatistics\Syllables::totalSyllables("same\xC2\xA0cat"));
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::averageSyllablesPerWord("same\xC2\xA0cat"));
+        $this->assertEquals(0, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables("same\xC2\xA0cat"));
+    }
+
+    /* cleanText() returns UTF-8, converting only text that isn't UTF-8 already.
+    -------------------- */
+    public function testCleaningKeepsUtf8Intact()
+    {
+        foreach (array("p\xC3\xA0s", "ni\xC3\x91o", "\xC3\x85se", "\xC3\x96l", "\xC3\x97") as $strText) {
+            $this->assertSame($strText . '.', DaveChild\TextStatistics\Text::cleanText($strText));
+            $this->assertSame($strText . '.', DaveChild\TextStatistics\Text::cleanText($strText . '.'));
+        }
+    }
+
+    public function testCleaningConvertsSingleByteText()
+    {
+        $this->assertSame("p\xC3\xA0s.", DaveChild\TextStatistics\Text::cleanText("p\xE0s"));
+        $this->assertSame("it's here.", DaveChild\TextStatistics\Text::cleanText("it\x92s here"));
+        $this->assertSame('a b.', DaveChild\TextStatistics\Text::cleanText("a\x97b"));
+        $this->assertSame('wait. now.', DaveChild\TextStatistics\Text::cleanText("wait\x85 now"));
+    }
+
+    public function testCleaningReplacesUtf8Punctuation()
+    {
+        $this->assertSame("it's here.", DaveChild\TextStatistics\Text::cleanText("it\xE2\x80\x99s here"));
+        $this->assertSame('a b.', DaveChild\TextStatistics\Text::cleanText("\xE2\x80\x9Ca\xE2\x80\x9D\xE2\x80\x94b"));
+        $this->assertSame('wait. now.', DaveChild\TextStatistics\Text::cleanText("wait\xE2\x80\xA6 now"));
     }
 
     public function testSyllableLoopsWhenWordCountIsBelowSplitWords()
