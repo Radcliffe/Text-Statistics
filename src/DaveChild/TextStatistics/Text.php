@@ -207,10 +207,9 @@ class Text
     }
 
     /**
-     * Gives letter count (ignores all non-letters). Tries mb_strlen and if
-     * that fails uses regular strlen.
+     * Gives letter count, in any alphabet (ignores all non-letters).
      * @param   string  $strText      Text to be measured
-     * @param   string  $strEncoding  Encoding of text
+     * @param   string  $strEncoding  Unused, as cleanText() always returns UTF-8
      * @return  int
      */
     public static function letterCount($strText, $strEncoding = '')
@@ -219,16 +218,7 @@ class Text
             return 0;
         }
 
-        $strText = self::cleanText($strText); // To clear out newlines etc
-        $intTextLength = 0;
-        $strText = preg_replace('`[^A-Za-z]+`', '', $strText);
-        if ($strEncoding == '') {
-            $intTextLength = mb_strlen($strText);
-        } else {
-            $intTextLength = mb_strlen($strText, $strEncoding);
-        }
-
-        return $intTextLength;
+        return (int) preg_match_all('`\p{L}`u', self::cleanText($strText));
     }
 
     /**

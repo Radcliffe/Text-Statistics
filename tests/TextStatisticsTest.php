@@ -285,6 +285,36 @@ class TextStatisticsTest extends \PHPUnit\Framework\TestCase
         $this->assertSame('wait. now.', DaveChild\TextStatistics\Text::cleanText("wait\xE2\x80\xA6 now"));
     }
 
+    /* Letters aren't limited to A-Z.
+    -------------------- */
+    public function testLetterCountIncludesNonAsciiLetters()
+    {
+        $this->assertSame(4, $this->TextStatistics->letterCount("caf\xC3\xA9"));
+        $this->assertSame(4, $this->TextStatistics->letterCount("caf\xE9"));
+        $this->assertSame(3, $this->TextStatistics->letterCount("\xD0\xBC\xD0\xB8\xD1\x80"));
+        $this->assertSame(4, DaveChild\TextStatistics\Text::letterCount("ni\xC3\x91o!"));
+    }
+
+    public function testLetterCountIgnoresCombiningMarksDigitsAndPunctuation()
+    {
+        // "e" followed by a combining acute accent is one letter.
+        $this->assertSame(4, $this->TextStatistics->letterCount("cafe\xCC\x81"));
+        $this->assertSame(0, $this->TextStatistics->letterCount('123 !?'));
+    }
+
+    public function testLetterCountDoesNotDependOnRequestedEncoding()
+    {
+        // cleanText() always returns UTF-8, whatever encoding was requested.
+        $objTextStatistics = new DaveChild\TextStatistics\TextStatistics('ISO-8859-1');
+        $this->assertSame(4, $objTextStatistics->letterCount("caf\xC3\xA9"));
+    }
+
+    public function testWordsWithoutAsciiLettersHaveSyllables()
+    {
+        $this->assertEquals(1, $this->TextStatistics->syllableCount("\xC3\xA0"));
+        $this->assertEquals(0, $this->TextStatistics->syllableCount('123'));
+    }
+
     public function testSyllableLoopsWhenWordCountIsBelowSplitWords()
     {
         // Double spaces only reach Syllables directly; cleanText() removes them.
