@@ -199,9 +199,34 @@ class TextStatisticsTest extends \PHPUnit\Framework\TestCase
     -------------------- */
     public function testSyllableLoopsWhenWordCountExceedsSplitWords()
     {
-        // Tabs survive cleanText(), so these also apply to the public API.
-        $this->assertEquals(1, $this->TextStatistics->averageSyllablesPerWord("and\tthen there"));
-        $this->assertEquals(1, $this->TextStatistics->wordsWithThreeSyllables("cat\tdog elephant"));
+        // Called directly because cleanText() replaces tabs on the public API.
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::averageSyllablesPerWord("and\tthen there"));
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables("cat\tdog elephant"));
+    }
+
+    /* Tabs and other whitespace separate words. "same\tcat" scores 3 syllables
+       if the words stay joined, and 2 once they are split.
+    -------------------- */
+    public function testCleaningReplacesTabsWithSpaces()
+    {
+        $this->assertSame('and then there.', DaveChild\TextStatistics\Text::cleanText("and\tthen \t there"));
+        $this->assertSame('and then there.', DaveChild\TextStatistics\Text::cleanText("and\x0bthen\x0cthere"));
+    }
+
+    public function testTabsSeparateWordsInPublicApi()
+    {
+        $this->assertEquals(2, $this->TextStatistics->totalSyllables("same\tcat"));
+        $this->assertEquals(1, $this->TextStatistics->averageSyllablesPerWord("same\tcat"));
+        $this->assertEquals(0, $this->TextStatistics->wordsWithThreeSyllables("same\tcat"));
+        $this->assertEquals(0, $this->TextStatistics->daleChallDifficultWordCount("and\tthen\tthere"));
+        $this->assertEquals(0, $this->TextStatistics->spacheDifficultWordCount("and\tthen\tthere"));
+    }
+
+    public function testTabsSeparateWordsInSyllables()
+    {
+        $this->assertEquals(2, DaveChild\TextStatistics\Syllables::totalSyllables("same\tcat"));
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::averageSyllablesPerWord("same\tcat"));
+        $this->assertEquals(0, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables("same\tcat"));
     }
 
     public function testSyllableLoopsWhenWordCountIsBelowSplitWords()

@@ -101,7 +101,7 @@ class Text
         $strText = trim($strText, '. ') . '.'; // Add final terminator.
         $strText = preg_replace('`[\.!?]`', '.', $strText); // Unify terminators
         $strText = preg_replace('`([\.\s]*\.[\.\s]*)`mis', '. ', $strText); // Merge terminators separated by whitespace.
-        $strText = preg_replace('`[ ]+`', ' ', $strText); // Remove multiple spaces
+        $strText = preg_replace('`\s+`', ' ', $strText); // Collapse tabs and multiple spaces
         $strText = preg_replace('`([\.])[\. ]+`', '$1', $strText); // Check for duplicated terminators
         $strText = trim(preg_replace('`[ ]*([\.])`', '$1 ', $strText)); // Pad sentence terminators
 
