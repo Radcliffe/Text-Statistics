@@ -285,6 +285,18 @@ class TextStatisticsTest extends \PHPUnit\Framework\TestCase
         $this->assertSame('wait. now.', DaveChild\TextStatistics\Text::cleanText("wait\xE2\x80\xA6 now"));
     }
 
+    /* cleanText() must not keep what it processes, or memory grows without
+       limit in long-running workers.
+    -------------------- */
+    public function testCleaningDoesNotRetainText()
+    {
+        $intMemoryBefore = memory_get_usage();
+        for ($i = 0; $i < 5000; $i++) {
+            DaveChild\TextStatistics\Text::cleanText('record ' . $i . ' ' . str_repeat('x', 1000));
+        }
+        $this->assertLessThan(1048576, memory_get_usage() - $intMemoryBefore);
+    }
+
     /* Word lists must come from the library, not the working directory or
        include path. Separate process, as the lists are cached once loaded.
     -------------------- */

@@ -11,11 +11,6 @@ class Text
     const WORD_SEPARATOR = '`(?:\s|\xC2\xA0)+`';
 
     /**
-     * @var array $clean Efficiency: Store strings once processed.
-     */
-    protected static $clean = array();
-
-    /**
      * Trims, removes line breaks, multiple spaces and generally cleans text
      * before processing.
      * @param   string|boolean  $strText      Text to be transformed
@@ -27,13 +22,6 @@ class Text
         // Check for boolean OR null value before processing as string
         if (is_bool($strText) || is_null($strText)) {
             return '';
-        }
-
-        // Check to see if we already processed this text. If we did, don't
-        // re-process it.
-        $key = sha1($strText);
-        if (isset(self::$clean[$key])) {
-            return self::$clean[$key];
         }
 
         // Text that isn't valid UTF-8 is assumed to be single-byte. These bytes
@@ -120,8 +108,6 @@ class Text
 
         $strText = trim($strText);
 
-        // Cache it and return
-        self::$clean[$key] = $strText;
         return $strText;
     }
 
