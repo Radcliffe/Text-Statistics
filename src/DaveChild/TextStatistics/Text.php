@@ -31,6 +31,11 @@ class Text
             return self::$clean[$key];
         }
 
+        // Non-breaking spaces separate words. Replace them before converting,
+        // because the conversion turns UTF-8 "à" into bytes containing C2 A0.
+        $strText = preg_replace('`&(nbsp|#0*160|#x0*a0);`i', ' ', $strText);
+        $strText = str_replace(mb_check_encoding($strText, 'UTF-8') ? "\xC2\xA0" : "\xA0", ' ', $strText);
+
         $strText = mb_convert_encoding($strText, 'UTF-8', 'ISO-8859-1');
 
         // Curly quotes etc

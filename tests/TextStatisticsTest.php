@@ -229,6 +229,27 @@ class TextStatisticsTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals(0, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables("same\tcat"));
     }
 
+    /* Non-breaking spaces separate words, in every form they can arrive in.
+    -------------------- */
+    public function testNonBreakingSpacesSeparateWords()
+    {
+        $arrForms = array("\xC2\xA0", "\xA0", '&nbsp;', '&#160;', '&#xA0;');
+        foreach ($arrForms as $strSpace) {
+            $strText = 'same' . $strSpace . 'cat';
+            $this->assertSame('same cat.', DaveChild\TextStatistics\Text::cleanText($strText));
+            $this->assertEquals(2, $this->TextStatistics->wordCount($strText));
+            $this->assertEquals(2, $this->TextStatistics->totalSyllables($strText));
+            $this->assertEquals(0, $this->TextStatistics->wordsWithThreeSyllables($strText));
+        }
+    }
+
+    public function testAccentedLettersAreNotTreatedAsNonBreakingSpaces()
+    {
+        // UTF-8 "à" is C3 A0, and contains C2 A0 once converted by cleanText().
+        $this->assertEquals(3, $this->TextStatistics->wordCount("p\xC3\xA0s de deux"));
+        $this->assertEquals(3, $this->TextStatistics->wordCount("p\xE0s de deux"));
+    }
+
     public function testSyllableLoopsWhenWordCountIsBelowSplitWords()
     {
         // Double spaces only reach Syllables directly; cleanText() removes them.
