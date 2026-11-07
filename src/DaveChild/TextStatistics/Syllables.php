@@ -338,7 +338,7 @@ class Syllables
     public static function totalSyllables($strText, $strEncoding = '')
     {
         $intSyllableCount = 0;
-        $arrWords = explode(' ', $strText);
+        $arrWords = preg_split(Text::WORD_SEPARATOR, $strText);
         $intWordCount = count($arrWords);
         for ($i = 0; $i < $intWordCount; $i++) {
             $intSyllableCount += self::syllableCount($arrWords[$i], $strEncoding);
@@ -357,8 +357,8 @@ class Syllables
     {
         $intSyllableCount = 0;
         $intWordCount = Text::wordCount($strText, $strEncoding);
-        $arrWords = explode(' ', $strText);
-        for ($i = 0; $i < $intWordCount; $i++) {
+        $arrWords = preg_split(Text::WORD_SEPARATOR, $strText);
+        for ($i = 0; $i < count($arrWords); $i++) {
             $intSyllableCount += self::syllableCount($arrWords[$i], $strEncoding);
         }
         $averageSyllables = (Maths::bcCalc($intSyllableCount, '/', $intWordCount));
@@ -375,9 +375,8 @@ class Syllables
     public static function wordsWithThreeSyllables($strText, $blnCountProperNouns = true, $strEncoding = '')
     {
         $intLongWordCount = 0;
-        $intWordCount = Text::wordCount($strText, $strEncoding);
-        $arrWords = explode(' ', $strText);
-        for ($i = 0; $i < $intWordCount; $i++) {
+        $arrWords = preg_split(Text::WORD_SEPARATOR, $strText);
+        for ($i = 0; $i < count($arrWords); $i++) {
             if (Syllables::syllableCount($arrWords[$i], $strEncoding) > 2) {
                 if ($blnCountProperNouns) {
                     $intLongWordCount++;

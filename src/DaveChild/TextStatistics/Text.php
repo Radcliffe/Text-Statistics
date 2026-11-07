@@ -6,9 +6,9 @@ class Text
 {
 
     /**
-     * @var array $clean Efficiency: Store strings once processed.
+     * Pattern matching the whitespace between words in UTF-8 text.
      */
-    protected static $clean = array();
+    const WORD_SEPARATOR = '`(?:\s|\xC2\xA0)+`';
 
     /**
      * Trims, removes line breaks, multiple spaces and generally cleans text
@@ -24,14 +24,32 @@ class Text
             return '';
         }
 
-        // Check to see if we already processed this text. If we did, don't
-        // re-process it.
-        $key = sha1($strText);
-        if (isset(self::$clean[$key])) {
-            return self::$clean[$key];
+        // Text that isn't valid UTF-8 is assumed to be single-byte. These bytes
+        // can only be replaced here, as they also occur inside UTF-8 characters.
+        if (!mb_check_encoding($strText, 'UTF-8')) {
+            $strText = str_replace(
+                array(
+                    chr(145),
+                    chr(146),
+                    chr(147),
+                    chr(148),
+                    chr(150),
+                    chr(151),
+                    chr(133)
+                ),
+                array(
+                    "'",
+                    "'",
+                    '"',
+                    '"',
+                    '-',
+                    '--',
+                    '...'
+                ),
+                $strText
+            );
+            $strText = mb_convert_encoding($strText, 'UTF-8', 'ISO-8859-1');
         }
-
-        $strText = mb_convert_encoding($strText, 'UTF-8', 'ISO-8859-1');
 
         // Curly quotes etc
         $strText = str_replace(
@@ -55,27 +73,6 @@ class Text
             ),
             $strText
         );
-        $strText = str_replace(
-            array(
-                chr(145),
-                chr(146),
-                chr(147),
-                chr(148),
-                chr(150),
-                chr(151),
-                chr(133)
-            ),
-            array(
-                "'",
-                "'",
-                '"',
-                '"',
-                '-',
-                '--',
-                '...'
-            ),
-            $strText
-        );
 
         // Replace periods within numbers
         $strText = preg_replace('`([^0-9][0-9]+)\.([0-9]+[^0-9])`mis', '${1}0$2', $strText);
@@ -86,6 +83,7 @@ class Text
         $strText = preg_replace('`\</?(address|blockquote|center|dir|div|dl|dd|dt|fieldset|form|h1|h2|h3|h4|h5|h6|menu|noscript|ol|p|pre|table|ul|li)[^>]*>`is', '.', $strText);
         $strText = html_entity_decode($strText);
         $strText = strip_tags($strText);
+        $strText = str_replace("\xC2\xA0", ' ', $strText); // Non-breaking spaces, including decoded &nbsp;
 
         // Assume blank lines (i.e., paragraph breaks) end sentences (useful
         // for titles in plain text documents) and replace remaining new
@@ -101,7 +99,7 @@ class Text
         $strText = trim($strText, '. ') . '.'; // Add final terminator.
         $strText = preg_replace('`[\.!?]`', '.', $strText); // Unify terminators
         $strText = preg_replace('`([\.\s]*\.[\.\s]*)`mis', '. ', $strText); // Merge terminators separated by whitespace.
-        $strText = preg_replace('`[ ]+`', ' ', $strText); // Remove multiple spaces
+        $strText = preg_replace('`\s+`', ' ', $strText); // Collapse tabs and multiple spaces
         $strText = preg_replace('`([\.])[\. ]+`', '$1', $strText); // Check for duplicated terminators
         $strText = trim(preg_replace('`[ ]*([\.])`', '$1 ', $strText)); // Pad sentence terminators
 
@@ -110,8 +108,6 @@ class Text
 
         $strText = trim($strText);
 
-        // Cache it and return
-        self::$clean[$key] = $strText;
         return $strText;
     }
 
@@ -197,10 +193,9 @@ class Text
     }
 
     /**
-     * Gives letter count (ignores all non-letters). Tries mb_strlen and if
-     * that fails uses regular strlen.
+     * Gives letter count, in any alphabet (ignores all non-letters).
      * @param   string  $strText      Text to be measured
-     * @param   string  $strEncoding  Encoding of text
+     * @param   string  $strEncoding  Unused, as cleanText() always returns UTF-8
      * @return  int
      */
     public static function letterCount($strText, $strEncoding = '')
@@ -209,16 +204,7 @@ class Text
             return 0;
         }
 
-        $strText = self::cleanText($strText); // To clear out newlines etc
-        $intTextLength = 0;
-        $strText = preg_replace('`[^A-Za-z]+`', '', $strText);
-        if ($strEncoding == '') {
-            $intTextLength = mb_strlen($strText);
-        } else {
-            $intTextLength = mb_strlen($strText, $strEncoding);
-        }
-
-        return $intTextLength;
+        return (int) preg_match_all('`\p{L}`u', self::cleanText($strText));
     }
 
     /**
@@ -234,7 +220,7 @@ class Text
         }
 
         // Will be tripped by em dashes with spaces either side, among other similar characters
-        $intWords = 1 + self::textLength(preg_replace('`[^ ]`', '', preg_replace('`\s+`', ' ', $strText)), $strEncoding); // Space count + 1 is word count
+        $intWords = 1 + self::textLength(preg_replace('`[^ ]`', '', preg_replace(self::WORD_SEPARATOR, ' ', $strText)), $strEncoding); // Space count + 1 is word count
 
         return $intWords;
     }

@@ -194,6 +194,173 @@ class TextStatisticsTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals(1.5, $this->TextStatistics->averageSyllablesPerWord('and then there was one because special ducklings deserve rainbows'));
     }
 
+    /* wordCount() collapses whitespace but these loops split on single spaces,
+       so the two counts can differ in either direction.
+    -------------------- */
+    public function testSyllableLoopsWhenWordCountExceedsSplitWords()
+    {
+        // Called directly because cleanText() replaces tabs on the public API.
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::averageSyllablesPerWord("and\tthen there"));
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables("cat\tdog elephant"));
+    }
+
+    /* Tabs and other whitespace separate words. "same\tcat" scores 3 syllables
+       if the words stay joined, and 2 once they are split.
+    -------------------- */
+    public function testCleaningReplacesTabsWithSpaces()
+    {
+        $this->assertSame('and then there.', DaveChild\TextStatistics\Text::cleanText("and\tthen \t there"));
+        $this->assertSame('and then there.', DaveChild\TextStatistics\Text::cleanText("and\x0bthen\x0cthere"));
+    }
+
+    public function testTabsSeparateWordsInPublicApi()
+    {
+        $this->assertEquals(2, $this->TextStatistics->totalSyllables("same\tcat"));
+        $this->assertEquals(1, $this->TextStatistics->averageSyllablesPerWord("same\tcat"));
+        $this->assertEquals(0, $this->TextStatistics->wordsWithThreeSyllables("same\tcat"));
+        $this->assertEquals(0, $this->TextStatistics->daleChallDifficultWordCount("and\tthen\tthere"));
+        $this->assertEquals(0, $this->TextStatistics->spacheDifficultWordCount("and\tthen\tthere"));
+    }
+
+    public function testTabsSeparateWordsInSyllables()
+    {
+        $this->assertEquals(2, DaveChild\TextStatistics\Syllables::totalSyllables("same\tcat"));
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::averageSyllablesPerWord("same\tcat"));
+        $this->assertEquals(0, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables("same\tcat"));
+    }
+
+    /* Non-breaking spaces separate words, in every form they can arrive in.
+    -------------------- */
+    public function testNonBreakingSpacesSeparateWords()
+    {
+        $arrForms = array("\xC2\xA0", "\xA0", '&nbsp;', '&#160;', '&#xA0;');
+        foreach ($arrForms as $strSpace) {
+            $strText = 'same' . $strSpace . 'cat';
+            $this->assertSame('same cat.', DaveChild\TextStatistics\Text::cleanText($strText));
+            $this->assertEquals(2, $this->TextStatistics->wordCount($strText));
+            $this->assertEquals(2, $this->TextStatistics->totalSyllables($strText));
+            $this->assertEquals(0, $this->TextStatistics->wordsWithThreeSyllables($strText));
+        }
+    }
+
+    public function testAccentedLettersAreNotTreatedAsNonBreakingSpaces()
+    {
+        // "à" is C3 A0 in UTF-8 and E0 in ISO-8859-1.
+        $this->assertEquals(3, $this->TextStatistics->wordCount("p\xC3\xA0s de deux"));
+        $this->assertEquals(3, $this->TextStatistics->wordCount("p\xE0s de deux"));
+        $this->assertEquals(3, DaveChild\TextStatistics\Text::wordCount("p\xC3\xA0s de deux"));
+        $this->assertEquals(2, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables("p\xC3\xA0s de deux elephant ananas"));
+    }
+
+    public function testNonBreakingSpacesSeparateWordsInDirectCalls()
+    {
+        $this->assertEquals(2, DaveChild\TextStatistics\Text::wordCount("same\xC2\xA0cat"));
+        $this->assertEquals(2, DaveChild\TextStatistics\Syllables::totalSyllables("same\xC2\xA0cat"));
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::averageSyllablesPerWord("same\xC2\xA0cat"));
+        $this->assertEquals(0, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables("same\xC2\xA0cat"));
+    }
+
+    /* cleanText() returns UTF-8, converting only text that isn't UTF-8 already.
+    -------------------- */
+    public function testCleaningKeepsUtf8Intact()
+    {
+        foreach (array("p\xC3\xA0s", "ni\xC3\x91o", "\xC3\x85se", "\xC3\x96l", "\xC3\x97") as $strText) {
+            $this->assertSame($strText . '.', DaveChild\TextStatistics\Text::cleanText($strText));
+            $this->assertSame($strText . '.', DaveChild\TextStatistics\Text::cleanText($strText . '.'));
+        }
+    }
+
+    public function testCleaningConvertsSingleByteText()
+    {
+        $this->assertSame("p\xC3\xA0s.", DaveChild\TextStatistics\Text::cleanText("p\xE0s"));
+        $this->assertSame("it's here.", DaveChild\TextStatistics\Text::cleanText("it\x92s here"));
+        $this->assertSame('a b.', DaveChild\TextStatistics\Text::cleanText("a\x97b"));
+        $this->assertSame('wait. now.', DaveChild\TextStatistics\Text::cleanText("wait\x85 now"));
+    }
+
+    public function testCleaningReplacesUtf8Punctuation()
+    {
+        $this->assertSame("it's here.", DaveChild\TextStatistics\Text::cleanText("it\xE2\x80\x99s here"));
+        $this->assertSame('a b.', DaveChild\TextStatistics\Text::cleanText("\xE2\x80\x9Ca\xE2\x80\x9D\xE2\x80\x94b"));
+        $this->assertSame('wait. now.', DaveChild\TextStatistics\Text::cleanText("wait\xE2\x80\xA6 now"));
+    }
+
+    /* cleanText() must not keep what it processes, or memory grows without
+       limit in long-running workers.
+    -------------------- */
+    public function testCleaningDoesNotRetainText()
+    {
+        $intMemoryBefore = memory_get_usage();
+        for ($i = 0; $i < 5000; $i++) {
+            DaveChild\TextStatistics\Text::cleanText('record ' . $i . ' ' . str_repeat('x', 1000));
+        }
+        $this->assertLessThan(1048576, memory_get_usage() - $intMemoryBefore);
+    }
+
+    /* Word lists must come from the library, not the working directory or
+       include path. Separate process, as the lists are cached once loaded.
+    -------------------- */
+    /**
+     * @runInSeparateProcess
+     */
+    public function testWordListsIgnoreFilesInWorkingDirectory()
+    {
+        $strDir = sys_get_temp_dir() . '/textstatistics-' . uniqid();
+        mkdir($strDir . '/resources', 0700, true);
+        file_put_contents($strDir . '/resources/SpacheWordList.php', '<?php $arrSpacheWordList = array("hijacked");');
+        file_put_contents($strDir . '/resources/DaleChallWordList.php', '<?php $arrDaleChallWordList = array("hijacked");');
+        $strOriginalDir = getcwd();
+        chdir($strDir);
+
+        try {
+            $this->assertNotContains('hijacked', DaveChild\TextStatistics\Resource::fetchSpacheWordList());
+            $this->assertNotContains('hijacked', DaveChild\TextStatistics\Resource::fetchDaleChallWordList());
+        } finally {
+            chdir($strOriginalDir);
+            unlink($strDir . '/resources/SpacheWordList.php');
+            unlink($strDir . '/resources/DaleChallWordList.php');
+            rmdir($strDir . '/resources');
+            rmdir($strDir);
+        }
+    }
+
+    /* Letters aren't limited to A-Z.
+    -------------------- */
+    public function testLetterCountIncludesNonAsciiLetters()
+    {
+        $this->assertSame(4, $this->TextStatistics->letterCount("caf\xC3\xA9"));
+        $this->assertSame(4, $this->TextStatistics->letterCount("caf\xE9"));
+        $this->assertSame(3, $this->TextStatistics->letterCount("\xD0\xBC\xD0\xB8\xD1\x80"));
+        $this->assertSame(4, DaveChild\TextStatistics\Text::letterCount("ni\xC3\x91o!"));
+    }
+
+    public function testLetterCountIgnoresCombiningMarksDigitsAndPunctuation()
+    {
+        // "e" followed by a combining acute accent is one letter.
+        $this->assertSame(4, $this->TextStatistics->letterCount("cafe\xCC\x81"));
+        $this->assertSame(0, $this->TextStatistics->letterCount('123 !?'));
+    }
+
+    public function testLetterCountDoesNotDependOnRequestedEncoding()
+    {
+        // cleanText() always returns UTF-8, whatever encoding was requested.
+        $objTextStatistics = new DaveChild\TextStatistics\TextStatistics('ISO-8859-1');
+        $this->assertSame(4, $objTextStatistics->letterCount("caf\xC3\xA9"));
+    }
+
+    public function testWordsWithoutAsciiLettersHaveSyllables()
+    {
+        $this->assertEquals(1, $this->TextStatistics->syllableCount("\xC3\xA0"));
+        $this->assertEquals(0, $this->TextStatistics->syllableCount('123'));
+    }
+
+    public function testSyllableLoopsWhenWordCountIsBelowSplitWords()
+    {
+        // Double spaces only reach Syllables directly; cleanText() removes them.
+        $this->assertEquals(2, DaveChild\TextStatistics\Syllables::averageSyllablesPerWord('because  special ducklings'));
+        $this->assertEquals(1, DaveChild\TextStatistics\Syllables::wordsWithThreeSyllables('cat  dog elephant'));
+    }
+
     /* Test Words
     -------------------- */
     public function testWordCount()

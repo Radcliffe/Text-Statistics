@@ -83,11 +83,28 @@ class Maths
             return false;
         }
 
+        // bcmath throws on exponent notation, which strval() gives for very
+        // small or large floats
+        if (self::$blnBcmath) {
+            $number1 = self::expandExponent($number1);
+            $number2 = self::expandExponent($number2);
+        }
+
         // Normalise operator
         $action = self::normaliseOperator($action);
 
         // Perform calculation
         return self::performCalc($number1, $action, $number2, $round, $decimals, $precision);
+    }
+
+    /**
+     * Rewrites a numeric string in exponent notation as a plain decimal.
+     * @param  string $number Numeric string
+     * @return string
+     */
+    private static function expandExponent($number)
+    {
+        return stripos($number, 'e') === false ? $number : number_format((float) $number, 20, '.', '');
     }
 
     /**

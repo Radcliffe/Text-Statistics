@@ -169,4 +169,25 @@ class TextStatisticsMaths extends \PHPUnit\Framework\TestCase
         $this->assertSame(false, DaveChild\TextStatistics\Maths::bcCalc('two', '+', 'three'));
         $this->assertSame(false, DaveChild\TextStatistics\Maths::bcCalc('two', '/', 'three'));
     }
+
+    /* bcmath throws on exponent notation, which strval() gives for very small
+       and very large floats.
+    -------------------- */
+    public function testExponentNotation()
+    {
+        $this->assertEqualsWithDelta(0.001, DaveChild\TextStatistics\Maths::bcCalc(0.00001, '*', 100), 1e-12);
+        $this->assertEqualsWithDelta(0.0099990000, DaveChild\TextStatistics\Maths::bcCalc(100, '*', 9.999E-5), 1e-12);
+        $this->assertEqualsWithDelta(-0.00001, DaveChild\TextStatistics\Maths::bcCalc(-0.00001, '+', 0), 1e-12);
+        $this->assertEqualsWithDelta(2.0E+25, DaveChild\TextStatistics\Maths::bcCalc(1.0E+25, '*', 2), 1e12);
+        $this->assertSame(1001, DaveChild\TextStatistics\Maths::bcCalc('1e3', '+', 1));
+    }
+
+    public function testScoresForLongTextWithoutSentenceBreaks()
+    {
+        // One 3-syllable word and one sentence in 10,001 words.
+        $strText = 'elephant ' . str_repeat('a ', 9999) . 'end';
+        $this->assertEqualsWithDelta(0.009999, $this->TextStatistics->percentageWordsWithThreeSyllables($strText), 1e-9);
+        $this->assertEqualsWithDelta(4000.4, $this->TextStatistics->gunningFogScore($strText), 0.1);
+        $this->assertEqualsWithDelta(-9.9, $this->TextStatistics->colemanLiauIndex($strText), 0.1);
+    }
 }
